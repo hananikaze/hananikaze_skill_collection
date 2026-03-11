@@ -1,0 +1,3 @@
+[submodule "budget-travel-china"]
+	path = budget-travel-china
+	url = git@github.com:hananikaze/budget-travel-china.git
