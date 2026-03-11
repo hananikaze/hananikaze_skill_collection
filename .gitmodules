@@ -1,6 +1,6 @@
-[submodule "budget-travel-china"]
-	path = budget-travel-china
-	url = git@github.com:hananikaze/budget-travel.git
 [submodule "paper-reader"]
 	path = paper-reader
 	url = git@github.com:hananikaze/paper-reader.git
+[submodule "budget-travel"]
+	path = budget-travel
+	url = git@github.com:hananikaze/budget-travel.git
