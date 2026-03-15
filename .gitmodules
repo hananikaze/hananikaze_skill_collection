@@ -4,3 +4,6 @@
 [submodule "budget-travel"]
 	path = budget-travel
 	url = git@github.com:hananikaze/budget-travel.git
+[submodule "lineline"]
+	path = lineline
+	url = git@github.com:hananikaze/lineline.git

@@ -1,8 +1,0 @@
-name: blog-publish
-description: Blog post publishing workflow
-stages:
-  - name: Draft
-  - name: Review
-  - name: Edit
-  - name: Publish
-  - name: Promote
