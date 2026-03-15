@@ -22,6 +22,7 @@ Each skill is a **git submodule** with its own repo under `hananikaze/<skill-nam
 ```
 ~/.openclaw/my-skills/           # hananikaze/hananikaze_skill_collection
 ├── .gitmodules                   # submodule registry
+├── skill-manager/                # meta-skill (直接在集合 repo 中，非 submodule)
 ├── budget-travel/                # submodule → hananikaze/budget-travel
 ├── paper-reader/                 # submodule → hananikaze/paper-reader
 ├── lineline/                     # submodule → hananikaze/lineline
@@ -31,108 +32,38 @@ Each skill is a **git submodule** with its own repo under `hananikaze/<skill-nam
 ## Operations
 
 ### List Installed Skills
-
-```bash
-cd ~/.openclaw/my-skills && git submodule status
-```
-
-Also check each skill's SKILL.md for description.
+查看 git submodule 状态，获取各 skill 的提交哈希和名称。也可读取各 skill 的 SKILL.md 获取描述。
 
 ### Add a New Skill (from existing repo)
-
-```bash
-cd ~/.openclaw/my-skills
-git submodule add git@github.com:hananikaze/<skill-name>.git <skill-name>
-git commit -m "feat: add <skill-name> skill"
-git push
-```
+在集合目录中通过 git submodule 添加目标 repo，提交并推送集合 repo。
 
 ### Create & Add a Brand New Skill
-
-1. Create the skill directory with code/SKILL.md locally (e.g., in `/tmp/<skill-name>`)
-2. Create GitHub repo:
-   ```bash
-   gh repo create hananikaze/<skill-name> --public --description "<description>" --source /tmp/<skill-name> --push
-   ```
-3. Add as submodule:
-   ```bash
-   cd ~/.openclaw/my-skills
-   git submodule add git@github.com:hananikaze/<skill-name>.git <skill-name>
-   git commit -m "feat: add <skill-name> skill"
-   git push
-   ```
-4. If the skill has npm dependencies, run `cd <skill-name> && npm install`
+1. 在临时目录中编写 skill 代码和 SKILL.md
+2. 在 GitHub 上为 `hananikaze` 创建同名公开 repo，推送代码
+3. 在集合 repo 中将新 repo 作为 submodule 添加，提交并推送
+4. 如有 npm 依赖，进入 skill 目录安装依赖
 
 ### Remove a Skill
+通过 git submodule 的标准流程取消注册、移除目录和模块缓存，提交推送。如需彻底删除，可同时删除 GitHub repo。
 
-```bash
-cd ~/.openclaw/my-skills
-git submodule deinit -f <skill-name>
-git rm -f <skill-name>
-rm -rf .git/modules/<skill-name>
-git commit -m "feat: remove <skill-name> skill"
-git push
-```
-
-Optionally delete the GitHub repo: `gh repo delete hananikaze/<skill-name> --yes`
-
-### Update a Skill (pull latest from its repo)
-
-```bash
-cd ~/.openclaw/my-skills/<skill-name>
-git pull origin main
-cd ..
-git add <skill-name>
-git commit -m "chore: update <skill-name> to latest"
-git push
-```
+### Update a Skill (pull latest)
+进入目标 skill 目录拉取最新代码，回到集合目录更新 submodule 引用，提交推送。
 
 ### Update All Skills
-
-```bash
-cd ~/.openclaw/my-skills
-git submodule update --remote --merge
-git add -A
-git commit -m "chore: update all skills to latest"
-git push
-```
+使用 git submodule 的远程更新功能批量拉取所有 skill 的最新版本，提交推送。
 
 ### Push Changes Within a Skill
-
-When modifying a skill's code:
-
-```bash
-# 1. Commit & push inside the skill repo
-cd ~/.openclaw/my-skills/<skill-name>
-git add -A && git commit -m "<message>" && git push
-
-# 2. Update the submodule reference in the collection
-cd ~/.openclaw/my-skills
-git add <skill-name>
-git commit -m "chore: update <skill-name> ref"
-git push
-```
+修改 skill 代码后需要两级推送：
+1. 先在 skill 目录内提交并推送到 skill 自己的 repo
+2. 再回到集合目录更新 submodule 引用，提交推送集合 repo
 
 ### Check Collection Status
-
-```bash
-cd ~/.openclaw/my-skills
-git submodule status          # show all submodules + commit hashes
-git status                    # show uncommitted changes
-git submodule foreach 'git status'  # status inside each skill
-```
-
-## Git Config Note
-
-GitHub email privacy is enabled for `hananikaze`. When committing in new repos, use:
-
-```bash
-git config user.email "hananikaze@users.noreply.github.com"
-```
+查看所有 submodule 状态和集合 repo 的未提交变更。可遍历各 skill 查看内部状态。
 
 ## Important Rules
 
-1. **Every skill = a submodule**. Never commit skill code directly into the collection repo.
-2. **Two-level push**: changes inside a skill need to be pushed in the skill repo first, then the submodule ref updated in the collection repo.
-3. **npm dependencies**: after cloning/adding a skill with package.json, run `npm install` inside it.
-4. **SKILL.md required**: every skill must have a SKILL.md at its root for OpenClaw to discover it.
+1. **Every skill = a submodule**。不要将 skill 代码直接提交到集合 repo（skill-manager 自身除外，它是 meta-skill）。
+2. **Two-level push**：skill 内部变更需先推 skill repo，再更新集合 ref。
+3. **npm 依赖**：添加含 package.json 的 skill 后，需进入目录安装依赖。
+4. **SKILL.md 必须存在**：每个 skill 根目录必须有 SKILL.md，OpenClaw 才能发现它。
+5. **Git 邮箱隐私**：GitHub 启用了邮箱隐私，新 repo 中使用 noreply 邮箱提交。
