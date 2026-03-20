@@ -7,9 +7,11 @@ Handles check-ins, expenses, and statistics for active trips.
 import json
 import os
 import sys
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, List
+from math import radians, sin, cos, sqrt, atan2
 
 # Paths
 SKILL_DIR = Path(__file__).parent.parent
@@ -206,6 +208,162 @@ def end_trip():
     stats_total()
 
 
+def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculate distance between two GPS points in kilometers."""
+    R = 6371  # Earth radius in km
+    
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    
+    return R * c
+
+
+def parse_gpx(gpx_path: str) -> List[Dict]:
+    """Parse GPX file and extract track points."""
+    tree = ET.parse(gpx_path)
+    root = tree.getroot()
+    
+    # Handle GPX namespace
+    ns = {'gpx': 'http://www.topografix.com/GPX/1/1'}
+    if not root.tag.endswith('gpx'):
+        # Try without namespace
+        ns = {}
+    
+    points = []
+    
+    # Try to find track points
+    for trkpt in root.findall('.//gpx:trkpt', ns) or root.findall('.//trkpt'):
+        lat = float(trkpt.get('lat'))
+        lon = float(trkpt.get('lon'))
+        
+        # Extract time
+        time_elem = trkpt.find('gpx:time', ns) or trkpt.find('time')
+        timestamp = time_elem.text if time_elem is not None else None
+        
+        # Extract elevation (optional)
+        ele_elem = trkpt.find('gpx:ele', ns) or trkpt.find('ele')
+        elevation = float(ele_elem.text) if ele_elem is not None else None
+        
+        points.append({
+            'lat': lat,
+            'lon': lon,
+            'timestamp': timestamp,
+            'elevation': elevation
+        })
+    
+    return points
+
+
+def import_gpx(gpx_path: str, date_filter: Optional[str] = None):
+    """Import GPX track and merge with current trip."""
+    data = load_current_trip()
+    if not data:
+        print("❌ 没有活跃的旅行。请先创建旅行或进行首次打卡。")
+        sys.exit(1)
+    
+    print(f"📂 解析 GPX 文件：{gpx_path}")
+    
+    try:
+        points = parse_gpx(gpx_path)
+    except Exception as e:
+        print(f"❌ GPX 解析失败：{e}")
+        sys.exit(1)
+    
+    if not points:
+        print("❌ GPX 文件中没有找到轨迹点")
+        sys.exit(1)
+    
+    # Filter by date if specified
+    if date_filter:
+        points = [p for p in points if p['timestamp'] and p['timestamp'].startswith(date_filter)]
+    
+    # Calculate statistics
+    if len(points) < 2:
+        print(f"⚠️ 轨迹点太少（{len(points)} 个），无法计算距离")
+        total_distance = 0
+    else:
+        total_distance = 0
+        for i in range(1, len(points)):
+            p1, p2 = points[i-1], points[i]
+            total_distance += haversine_distance(p1['lat'], p1['lon'], p2['lat'], p2['lon'])
+    
+    # Add GPS track to trip data
+    if 'gps_tracks' not in data:
+        data['gps_tracks'] = []
+    
+    track_entry = {
+        'imported_at': get_timestamp(),
+        'source_file': os.path.basename(gpx_path),
+        'point_count': len(points),
+        'total_distance_km': round(total_distance, 2),
+        'date_filter': date_filter,
+        'time_range': {
+            'start': points[0]['timestamp'] if points[0]['timestamp'] else None,
+            'end': points[-1]['timestamp'] if points[-1]['timestamp'] else None
+        },
+        'points': points
+    }
+    
+    data['gps_tracks'].append(track_entry)
+    save_current_trip(data)
+    
+    # Output
+    print(f"✅ GPS 轨迹已导入")
+    print(f"📍 轨迹点：{len(points)} 个")
+    if total_distance > 0:
+        print(f"🚶 总距离：{total_distance:.2f} km")
+    if points[0]['timestamp'] and points[-1]['timestamp']:
+        start_time = points[0]['timestamp'][:19]
+        end_time = points[-1]['timestamp'][:19]
+        print(f"⏱️ 时间范围：{start_time} ~ {end_time}")
+    
+    # Match with check-ins
+    matched = match_checkins_with_gps(data, points)
+    if matched:
+        save_current_trip(data)
+        print(f"\n🎯 已为 {matched} 个打卡点补充 GPS 坐标")
+
+
+def match_checkins_with_gps(data: Dict, gps_points: List[Dict]) -> int:
+    """Match check-ins with nearby GPS points and add coordinates."""
+    matched_count = 0
+    
+    for checkin in data['checkins']:
+        if checkin.get('lat') is not None:
+            continue  # Already has GPS
+        
+        # Parse checkin timestamp
+        try:
+            checkin_time = datetime.fromisoformat(checkin['timestamp'].replace('+08:00', ''))
+        except:
+            continue
+        
+        # Find GPS points within ±10 minutes
+        nearby_points = []
+        for gps in gps_points:
+            if not gps['timestamp']:
+                continue
+            try:
+                gps_time = datetime.fromisoformat(gps['timestamp'].replace('Z', ''))
+                time_diff = abs((gps_time - checkin_time).total_seconds())
+                if time_diff <= 600:  # 10 minutes
+                    nearby_points.append((time_diff, gps))
+            except:
+                continue
+        
+        if nearby_points:
+            # Use closest point
+            nearby_points.sort(key=lambda x: x[0])
+            closest_gps = nearby_points[0][1]
+            checkin['lat'] = closest_gps['lat']
+            checkin['lon'] = closest_gps['lon']
+            matched_count += 1
+    
+    return matched_count
+
+
 def main():
     if len(sys.argv) < 2:
         print("Usage:")
@@ -213,6 +371,7 @@ def main():
         print("  checkin_manager.py checkin <地点> [--note <备注>]")
         print("  checkin_manager.py expense --category <类别> --amount <金额> [--description <描述>]")
         print("  checkin_manager.py stats today|total")
+        print("  checkin_manager.py import-gpx <GPX文件路径> [--date YYYY-MM-DD]")
         print("  checkin_manager.py end-trip")
         sys.exit(1)
     
@@ -274,6 +433,22 @@ def main():
         else:
             print(f"❌ 未知统计类型：{stat_type}")
             sys.exit(1)
+    
+    elif command == "import-gpx":
+        if len(sys.argv) < 3:
+            print("❌ 需要指定 GPX 文件路径")
+            sys.exit(1)
+        gpx_path = sys.argv[2]
+        if not os.path.exists(gpx_path):
+            print(f"❌ 文件不存在：{gpx_path}")
+            sys.exit(1)
+        
+        date_filter = None
+        if "--date" in sys.argv:
+            date_idx = sys.argv.index("--date") + 1
+            date_filter = sys.argv[date_idx]
+        
+        import_gpx(gpx_path, date_filter)
     
     elif command == "end-trip":
         end_trip()

@@ -52,6 +52,43 @@ Record your travel journey in real-time: location check-ins, expenses, and stati
 📊 本次旅行累计：¥218.5
 ```
 
+### 4. Import GPS Track 🗺️
+
+**Format**: `导入轨迹 <GPX文件>` or provide GPX file directly
+
+**Examples**:
+```
+导入轨迹 /path/to/track.gpx
+导入轨迹 2026-03-21.gpx --date 2026-03-21
+```
+
+**Response**:
+```
+✅ GPS 轨迹已导入
+📍 轨迹点：1847 个
+🚶 总距离：12.35 km
+⏱️ 时间范围：2026-03-21 08:00 ~ 18:30
+
+🎯 已为 5 个打卡点补充 GPS 坐标
+```
+
+**How it works**:
+- Parses GPX file from phone's GPS logger
+- Calculates total distance traveled
+- Auto-matches check-ins with nearby GPS points (±10 min)
+- Adds coordinates to existing check-ins
+- Stores complete track for later visualization
+
+**Supported sources**:
+- iPhone Health app (export as GPX)
+- Android GPSLogger
+- Strava/Nike Run Club export
+- Any standard GPX 1.1 file
+
+**Commands**:
+- `今日统计` - today's summary
+- `总花费` or `总统计` - trip total summary
+
 ### 3. View Statistics 📊
 
 **Commands**:
@@ -74,6 +111,7 @@ Record your travel journey in real-time: location check-ins, expenses, and stati
 📅 天数：2 天
 💵 总花费：¥345.5
 📍 总打卡：12 个地点
+🗺️ GPS 轨迹：24.7 km
 ```
 
 ## Data Storage 📂
@@ -101,8 +139,8 @@ travel-checkin/
       "timestamp": "2026-03-21T07:18:00+08:00",
       "location": "天坛公园",
       "note": "",
-      "lat": null,
-      "lng": null
+      "lat": 39.8822,
+      "lng": 116.4066
     }
   ],
   "expenses": [
@@ -111,6 +149,20 @@ travel-checkin/
       "category": "门票",
       "description": "天坛公园",
       "amount": 15.0
+    }
+  ],
+  "gps_tracks": [
+    {
+      "imported_at": "2026-03-21T20:00:00+08:00",
+      "source_file": "2026-03-21.gpx",
+      "point_count": 1847,
+      "total_distance_km": 12.35,
+      "date_filter": "2026-03-21",
+      "time_range": {
+        "start": "2026-03-21T08:00:00Z",
+        "end": "2026-03-21T18:30:00Z"
+      },
+      "points": [...]
     }
   ]
 }
@@ -163,6 +215,10 @@ python3 scripts/checkin_manager.py new-trip --destination 长沙
 
 # End trip
 python3 scripts/checkin_manager.py end-trip
+
+# Import GPX track
+python3 scripts/checkin_manager.py import-gpx /path/to/track.gpx
+python3 scripts/checkin_manager.py import-gpx track.gpx --date 2026-03-21
 ```
 
 Script handles:
@@ -171,6 +227,8 @@ Script handles:
 - ✅ Statistics calculation
 - ✅ Data validation
 - ✅ Archive management
+- ✅ GPX parsing and distance calculation
+- ✅ Auto-matching check-ins with GPS coordinates
 
 ## Natural Language Parsing
 
@@ -199,15 +257,37 @@ For immediate use during travel:
 
 1. **No setup needed** - first check-in auto-creates files
 2. **QQ-based** - all interactions via QQ messages
-3. **No GPS** - manual text-based check-ins only
+3. **Manual check-ins** - text-based location recording
 4. **Simple expenses** - quick category + amount recording
 5. **Instant stats** - anytime summary on demand
+6. **GPX import** - add GPS tracks after trip ends
+
+**Workflow**:
+```
+旅行前：无需配置
+  ↓
+旅行中：手动打卡 + 记账（QQ消息）
+  ↓
+旅行后：导入手机 GPX → 自动补全坐标 → 完整轨迹
+```
+
+**How to export GPX from phone**:
+
+**iPhone**:
+1. 健康 app → 个人 → 运动与健身 → 导出健康数据
+2. 解压 export.zip → workout-routes/route_*.gpx
+3. 或使用第三方 GPS 记录 app（如 Trails）
+
+**Android**:
+1. 安装 GPSLogger app
+2. 记录轨迹 → 分享 → GPX 格式
+3. 或从 Google Timeline 导出
 
 Future enhancements (v2):
-- GPS tracking integration (OwnTracks)
+- Real-time GPS tracking (OwnTracks integration)
 - Automatic navigation generation (Amap links)
 - Photo/media attachments
-- Route visualization
+- Route visualization on map
 - Budget comparison with planning stage
 
 ## Response Style
