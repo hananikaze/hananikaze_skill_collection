@@ -1,0 +1,11 @@
+# Data files (local-only, never commit)
+data/
+*.json
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# System files
+.DS_Store
