@@ -36,7 +36,10 @@ Get from budget-travel or user:
 **Goal**: Discover ALL possible attractions (conventional + unconventional)
 
 **Steps**:
-1. Use Exa to search for attractions in the city
+1. Use **agent-reach** (Exa via mcporter) to search for attractions in the city
+   ```bash
+   mcporter call 'exa.web_search_exa(query: "保定 景点", numResults: 5)'
+   ```
 2. Query multiple categories:
    - 🏛️ Tourist attractions (景点)
    - 🍜 Local food streets (美食街/小吃)
@@ -321,6 +324,10 @@ Extract from context:
 - Arrival time from budget-travel output
 - City name from budget-travel
 - Available hours
+
+**Use agent-reach for web searches**:
+- Exa search via `mcporter call 'exa.web_search_exa(query: "...", numResults: N)'`
+- Alternative: Use built-in `web_search` tool if mcporter unavailable
 
 ## Reference Documents
 

@@ -10,22 +10,51 @@ import sys
 from typing import List, Dict
 
 def exa_search(query: str, num_results: int = 5) -> List[Dict]:
-    """Search using Exa via mcporter."""
+    """Search using Exa via mcporter (agent-reach)."""
     cmd = [
         "mcporter", "call",
         f"exa.web_search_exa(query: \"{query}\", numResults: {num_results})"
     ]
     
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         if result.returncode != 0:
             print(f"⚠️ Exa search failed: {result.stderr}", file=sys.stderr)
             return []
         
-        # Parse mcporter output (JSON)
-        output = result.stdout.strip()
-        data = json.loads(output)
-        return data.get('results', [])
+        # Parse mcporter output
+        # Output format: multiple sections with Title/URL/Highlights
+        results = []
+        output = result.stdout
+        
+        # Split by "---" or parse line by line
+        sections = output.split('\n---\n')
+        for section in sections:
+            if 'Title:' in section and 'URL:' in section:
+                lines = section.split('\n')
+                title = ""
+                url = ""
+                text = ""
+                
+                for line in lines:
+                    if line.startswith('Title:'):
+                        title = line.replace('Title:', '').strip()
+                    elif line.startswith('URL:'):
+                        url = line.replace('URL:', '').strip()
+                    elif line.startswith('Highlights:'):
+                        # Rest is content
+                        idx = section.index('Highlights:')
+                        text = section[idx+11:].strip()
+                        break
+                
+                if title and url:
+                    results.append({
+                        'title': title,
+                        'url': url,
+                        'text': text[:500]  # Truncate
+                    })
+        
+        return results
     except Exception as e:
         print(f"⚠️ Exa search error: {e}", file=sys.stderr)
         return []
